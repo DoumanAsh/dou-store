@@ -1,0 +1,37 @@
+[package]
+name = "dou-store"
+version = "0.1.0"
+authors = ["Douman <douman@gmx.se>"]
+edition = "2018"
+publish = false
+
+[dependencies.tokio]
+version = "0.2"
+default-features = false
+features =["rt-core", "io-driver", "io-util", "tcp"]
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+
+[dependencies.sled]
+version = "0.34"
+default-features = false
+features = ["no_logs", "no_metrics", "compression"]
+
+[dependencies.rogu]
+version = "0.2"
+features = [
+    "std",
+    "release_level_info_off",
+    "release_level_debug_off",
+    "release_level_trace_off",
+]
+
+[dependencies]
+xxhash-c = "0.8"
+tokio-rustls = "0.14"
+json-rpc-types = "1.0.0-beta.3"
+serde_json = "1"
+arg = "0.3"
+c-ffi = "0.4"
