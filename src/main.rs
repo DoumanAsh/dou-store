@@ -15,6 +15,8 @@ fn rust_main(args: c_ffi::Args) -> bool {
 
     rogu::set_level(rogu::Level::INFO);
 
+    let tcp = server::tcp::Tcp::new(args.port, args.db.view());
+
     let mut rt = match tokio::runtime::Builder::new().core_threads(1).max_threads(8).enable_io().basic_scheduler().build() {
         Ok(rt) => rt,
         Err(error) => {
@@ -23,9 +25,10 @@ fn rust_main(args: c_ffi::Args) -> bool {
         }
     };
 
-    let tcp = server::tcp::Server::new(args.port, args.db.view());
-
     loop {
-        rt.block_on(tcp.start());
+        if !rt.block_on(tcp.start()) {
+            //We only exit with false when server unable to start.
+            std::thread::sleep(core::time::Duration::from_secs(1));
+        }
     }
 }

@@ -8,7 +8,7 @@ publish = false
 [dependencies.tokio]
 version = "0.2"
 default-features = false
-features =["rt-core", "io-driver", "io-util", "tcp"]
+features =["rt-core", "io-driver", "io-util", "tcp", "sync"]
 
 [dependencies.serde]
 version = "1"
