@@ -14,6 +14,7 @@ const SET_CONFIG: &'static str = "set_config";
 //params
 const ID: &'static str = "id";
 const DATA: &'static str = "data";
+const RESULT: &'static str = "result";
 
 const LOCAL_HOST: net::IpAddr = net::IpAddr::V4(net::Ipv4Addr::new(127, 0, 0, 1));
 
@@ -31,9 +32,19 @@ impl Handler {
     }
 
     #[inline]
+    fn invalid_req(&self, msg: &'static str, id: Option<Id>) -> Response {
+        Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data(msg), id)
+    }
+
+    #[inline]
+    fn internal_err(&self, err: i64, id: Option<Id>) -> Response {
+        Response::error(Version::V2, Error::from_code(ErrorCode::ServerError(err)), id)
+    }
+
+    #[inline]
     fn checksum_response(&self, num: u64, id: Option<Id>) -> Response {
         let mut payload = serde_json::map::Map::with_capacity(1);
-        payload.insert("result".to_owned(), num.into());
+        payload.insert(RESULT.to_owned(), num.into());
         Response::result(Version::V2, payload.into(), id)
     }
 
@@ -42,12 +53,12 @@ impl Handler {
             Ok(data) => data,
             Err(error) => {
                 error!("Data corruption in config. Unexpected non-utf8 config: {}", error);
-                return Response::error(Version::V2, Error::from_code(ErrorCode::ServerError(2)), id)
+                return self.internal_err(2, id)
             }
         };
 
         let mut payload = serde_json::map::Map::with_capacity(1);
-        payload.insert("result".to_owned(), data.into());
+        payload.insert(RESULT.to_owned(), data.into());
         Response::result(Version::V2, payload.into(), id)
     }
 
@@ -67,7 +78,7 @@ impl Handler {
             Ok(_) => self.checksum_response(hash, id),
             Err(error) => {
                 error!("Unable to set config: {}", error);
-                return Response::error(Version::V2, Error::from_code(ErrorCode::ServerError(4)), id)
+                return self.internal_err(4, id);
             }
         }
     }
@@ -84,11 +95,11 @@ impl Handler {
                 Ok(None) => self.checksum_response(0, id),
                 Err(error) => {
                     error!("Internal error accessing checksum tree: {}", error);
-                    Response::error(Version::V2, Error::from_code(ErrorCode::ServerError(1)), id)
+                    self.internal_err(1, id)
                 }
             },
-            Some(_) => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params field 'id' must be a string"), id),
-            None => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params is missing field 'id'"), id),
+            Some(_) => self.invalid_req("Params field 'id' must be a string", id),
+            None => self.invalid_req("Params is missing field 'id'", id),
         }
     }
 
@@ -96,8 +107,8 @@ impl Handler {
     fn handle_set_config_req(&self, params: RequestPayload, id: Option<Id>) -> Response {
         let key = match params.get(ID) {
             Some(serde_json::Value::String(value)) => value,
-            Some(_) => return Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params field 'id' must be a string"), id),
-            None => return Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params is missing field 'id'"), id),
+            Some(_) => return self.invalid_req("Params field 'id' must be a string", id),
+            None => return self.invalid_req("Params is missing field 'id'", id),
         };
 
         match params.get(DATA) {
@@ -107,11 +118,11 @@ impl Handler {
                 Ok(value) => self.set_config_response(key, &value, id),
                 Err(error) => {
                     error!("Internal error serializing json: {}", error);
-                    Response::error(Version::V2, Error::from_code(ErrorCode::ServerError(3)), id)
+                    self.internal_err(3, id)
                 },
             },
-            Some(_) => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params field 'data' must be a string or object"), id),
-            None => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params is missing field 'data'"), id),
+            Some(_) => self.invalid_req("Params field 'data' must be a string or object", id),
+            None => self.invalid_req("Params is missing field 'data'", id),
         }
     }
 
@@ -123,11 +134,11 @@ impl Handler {
                 Ok(None) => self.config_response(&[], id),
                 Err(error) => {
                     error!("Internal error accessing config tree: {}", error);
-                    Response::error(Version::V2, Error::from_code(ErrorCode::ServerError(1)), id)
+                    self.internal_err(1, id)
                 },
             },
-            Some(_) => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params field 'id' must be a string"), id),
-            None => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Params is missing field 'id'"), id),
+            Some(_) => self.invalid_req("Params field 'id' must be a string", id),
+            None => self.invalid_req("Params is missing field 'id'", id),
         }
     }
 
@@ -136,15 +147,15 @@ impl Handler {
             "ping" => Response::result(Version::V2, Default::default(), request.id),
             CHECKSUM => match request.params {
                 Some(params) => self.handle_checksum_req(params, request.id),
-                None => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Missing params"), request.id)
+                None => self.invalid_req("Missing params", request.id),
             },
             CONFIG => match request.params {
                 Some(params) => self.handle_config_req(params, request.id),
-                None => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Missing params"), request.id)
+                None => self.invalid_req("Missing params", request.id),
             },
             SET_CONFIG => match request.params {
                 Some(params) => self.handle_set_config_req(params, request.id),
-                None => Response::error(Version::V2, Error::from_code(ErrorCode::InvalidRequest).set_data("Missing params"), request.id)
+                None => self.invalid_req("Missing params", request.id),
             },
             _ => Response::error(Version::V2, Error::from_code(ErrorCode::MethodNotFound), request.id),
         }
