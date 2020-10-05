@@ -3,10 +3,13 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use rogu::{info, warn, trace};
 
-use super::{handle_request, LOCAL_HOST};
+use super::{Handler, LOCAL_HOST};
 use crate::protocol::{Request, EOT};
+use crate::db;
 
-pub async fn handle_client(socket: TcpStream, _addr: std::net::SocketAddr) {
+pub async fn handle_client(db: db::DbView, socket: TcpStream, _addr: std::net::SocketAddr) {
+    let handler = Handler::new(db);
+
     let mut serde_buf = Vec::<u8>::new();
     let mut read_buf = Vec::new();
     let mut socket = BufReader::new(socket);
@@ -31,7 +34,7 @@ pub async fn handle_client(socket: TcpStream, _addr: std::net::SocketAddr) {
                     continue;
                 }
 
-                let response = handle_request(request).await;
+                let response = handler.handle_request(request).await;
                 match serde_json::to_writer(&mut serde_buf, &response) {
                     Ok(_) => (),
                     Err(_) => unreachable!(),
@@ -55,29 +58,43 @@ pub async fn handle_client(socket: TcpStream, _addr: std::net::SocketAddr) {
     }
 }
 
-pub async fn start(port: u16) -> bool {
-    let mut serv = match TcpListener::bind((LOCAL_HOST, port)).await {
-        Ok(serv) => serv,
-        Err(error) => {
-            warn!("Unable to start TCP server on {}:{}. Error: {}", LOCAL_HOST, port, error);
-            return false;
+pub struct Server {
+    port: u16,
+    db: db::DbView,
+}
+
+impl Server {
+    pub const fn new(port: u16, db: db::DbView) -> Self {
+        Self {
+            port,
+            db,
         }
-    };
+    }
 
-    info!("Start TCP on {}:{}", LOCAL_HOST, port);
-
-    loop {
-        let (socket, _addr) = match serv.accept().await {
-            Ok(res) => res,
+    pub async fn start(&self) -> bool {
+        let mut serv = match TcpListener::bind((LOCAL_HOST, self.port)).await {
+            Ok(serv) => serv,
             Err(error) => {
-                warn!("TCP Error: {}", error);
-                return false
+                warn!("Unable to start TCP server on {}:{}. Error: {}", LOCAL_HOST, self.port, error);
+                return false;
             }
         };
 
+        info!("Start TCP on {}:{}", LOCAL_HOST, self.port);
 
-        trace!("{}: Connected over TCP", _addr);
+        loop {
+            let (socket, _addr) = match serv.accept().await {
+                Ok(res) => res,
+                Err(error) => {
+                    warn!("TCP Error: {}", error);
+                    return false
+                }
+            };
 
-        tokio::spawn(handle_client(socket, _addr));
+
+            trace!("{}: Connected over TCP", _addr);
+
+            tokio::spawn(handle_client(self.db.clone(), socket, _addr));
+        }
     }
 }

@@ -23,7 +23,9 @@ fn rust_main(args: c_ffi::Args) -> bool {
         }
     };
 
+    let tcp = server::tcp::Server::new(args.port, args.db.view());
+
     loop {
-        rt.block_on(server::tcp::start(args.port));
+        rt.block_on(tcp.start());
     }
 }

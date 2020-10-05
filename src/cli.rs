@@ -9,7 +9,7 @@ pub struct Cli {
 
     #[arg(long, default_value = "Default::default()")]
     ///Path on filesystem to store database. Default: dou_store_db
-    pub db: crate::db::ArgInit,
+    pub db: crate::db::Db,
 }
 
 impl Cli {
