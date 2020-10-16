@@ -36,6 +36,8 @@ jobs:
 
     - name: Build release
       run: cross build --release --target ${{matrix.target}}
+      env:
+        RUSTFLAGS: '-C link-arg=-s'
 
     - name: Pack
       run: zip -j dou-store-${{matrix.target}}.zip target/${{matrix.target}}/release/dou-store
