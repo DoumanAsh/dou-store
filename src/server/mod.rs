@@ -1,15 +1,18 @@
 use std::net;
 
-use json_rpc_types::{Id, Error, Version, ErrorCode};
 use rogu::error;
+use json_rpc_types::{Id, Error, Version, ErrorCode};
+use xxhash_rust::xxh3::xxh3_64;
+use xxhash_rust::const_xxh3::xxh3_64 as const_xxh3_64;
 
 use crate::db;
 use crate::protocol::{Request, RequestPayload, Response};
 
-///methods
-const CHECKSUM: &'static str = "cheksum";
-const CONFIG: &'static str = "config";
-const SET_CONFIG: &'static str = "set_config";
+//methods
+const PING: u64 = const_xxh3_64(b"ping");
+const CHECKSUM: u64 = const_xxh3_64(b"cheksum");
+const CONFIG: u64 = const_xxh3_64(b"config");
+const SET_CONFIG: u64 = const_xxh3_64(b"set_config");
 
 //params
 const ID: &'static str = "id";
@@ -66,7 +69,7 @@ impl Handler {
         use sled::Transactional;
         use sled::transaction::TransactionError;
 
-        let hash = xxhash_c::xxh3_64(value.as_bytes());
+        let hash = xxh3_64(value.as_bytes());
 
         let result: Result<(), TransactionError<bool>> = (&self.db.checksum, &self.db.config).transaction(|(checksum, config)| {
             checksum.insert(key.as_bytes(), &hash.to_be_bytes())?;
@@ -143,8 +146,8 @@ impl Handler {
     }
 
     async fn handle_request(&self, request: Request) -> Response {
-        match request.method.as_str() {
-            "ping" => Response::result(Version::V2, Default::default(), request.id),
+        match xxh3_64(request.method.as_str().as_bytes()) {
+            PING => Response::result(Version::V2, Default::default(), request.id),
             CHECKSUM => match request.params {
                 Some(params) => self.handle_checksum_req(params, request.id),
                 None => self.invalid_req("Missing params", request.id),

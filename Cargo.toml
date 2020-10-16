@@ -28,8 +28,11 @@ features = [
     "release_level_trace_off",
 ]
 
+[dependencies.xxhash-rust]
+version = "0.8.0-beta.3"
+features = ["xxh3", "const_xxh3"]
+
 [dependencies]
-xxhash-c = "0.8"
 tokio-rustls = "0.14"
 json-rpc-types = "1.0.0-beta.3"
 serde_json = "1"
