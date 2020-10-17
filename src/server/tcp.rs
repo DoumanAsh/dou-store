@@ -116,7 +116,7 @@ impl Server {
     }
 
     pub async fn start(self: Arc<Self>) -> bool {
-        let mut serv = match TcpListener::bind((LOCAL_HOST, self.port)).await {
+        let serv = match TcpListener::bind((LOCAL_HOST, self.port)).await {
             Ok(serv) => serv,
             Err(error) => {
                 warn!("Unable to start TCP server on {}:{}. Error: {}", LOCAL_HOST, self.port, error);
