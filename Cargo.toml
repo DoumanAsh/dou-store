@@ -29,7 +29,7 @@ features = [
 ]
 
 [dependencies.xxhash-rust]
-version = "0.8.0-beta.3"
+version = "0.8"
 features = ["xxh3", "const_xxh3"]
 
 [dependencies]
