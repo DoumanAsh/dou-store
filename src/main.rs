@@ -17,7 +17,7 @@ fn rust_main(args: c_ffi::Args) -> bool {
 
     let tcp = server::tcp::Tcp::new(args.port, args.db.view());
 
-    let rt = match tokio::runtime::Builder::new_current_thread().max_threads(8).enable_io().build() {
+    let rt = match tokio::runtime::Builder::new_current_thread().max_blocking_threads(8).enable_io().build() {
         Ok(rt) => rt,
         Err(error) => {
             eprintln!("Unable to start IO loop: {}", error);
